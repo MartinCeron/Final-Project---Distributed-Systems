@@ -4,7 +4,7 @@ import java.util.*;
 
 public class AudioStreamingServer {
     private static final int PORT = 12345;
-    private static final String MUSIC_FOLDER = "C:/Users/Sam/Music";
+    private static final String MUSIC_FOLDER = "./test";
     private static final List<String> trackList = new ArrayList<>();
     private static final List<Socket> clients = Collections.synchronizedList(new ArrayList<>());
 
