@@ -1,0 +1,21 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF">
+
+    <EditText
+        android:id="@+id/searchBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Search songs or artists"
+        android:layout_margin="16dp" />
+
+    <ListView
+        android:id="@+id/searchResultsList"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/searchBar"
+        android:dividerHeight="1dp"
+        android:divider="@android:color/darker_gray" />
+
+</RelativeLayout>
