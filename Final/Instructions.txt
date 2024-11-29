@@ -1,12 +1,13 @@
 compile commands:
 javac -classpath .;C:\java-libs\* AudioStreamingServer.java
+javac --module-path "C:\javafx-sdk\lib" --add-modules javafx.controls,javafx.fxml -classpath .;C:\java-libs\* AudioStreamingClientUI.java
+
 
 
 java -classpath .;C:\java-libs\* AudioStreamingServer
 
 
 
-javac --module-path "C:\javafx-sdk\lib" --add-modules javafx.controls,javafx.fxml -classpath .;C:\java-libs\* AudioStreamingClientUI.java
 
 java --module-path "C:\javafx-sdk\lib" --add-modules javafx.controls,javafx.fxml -classpath .;C:\java-libs\* AudioStreamingClientUI
 
@@ -14,4 +15,5 @@ java --module-path "C:\javafx-sdk\lib" --add-modules javafx.controls,javafx.fxml
 u need to have the java-libs and javafx folder in your c drive before running, both are in the finals folder.
 U need to add the lib folder in javafxsdk to path
 u need jdk 21
+if final doesnt work, try final-laptop
 

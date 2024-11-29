@@ -1,0 +1,67 @@
+/* General Styles */
+.root {
+    -fx-font-family: 'Segoe UI', sans-serif;
+    -fx-background-color: #1e1e1e;
+    -fx-text-fill: #ffffff;
+}
+
+/* Labels */
+.label {
+    -fx-text-fill: #ffffff;
+}
+
+/* Buttons */
+.button {
+    -fx-background-color: #3c3f41;
+    -fx-text-fill: #ffffff;
+    -fx-border-color: #6a1b9a;
+    -fx-border-width: 1px;
+}
+
+.button:hover {
+    -fx-background-color: #6a1b9a;
+}
+
+/* TextFields and TextAreas */
+.text-field, .password-field {
+    -fx-background-color: #2e2e2e;
+    -fx-text-fill: #ffffff;
+    -fx-border-color: #6a1b9a;
+    -fx-border-width: 1px;
+}
+
+.text-area {
+    -fx-background-color: #2e2e2e;
+    -fx-text-fill: #ffffff;
+    -fx-border-color: #6a1b9a;
+    -fx-border-width: 1px;
+}
+
+.list-view {
+    -fx-background-color: #2e2e2e;
+    -fx-control-inner-background: #2e2e2e;
+    -fx-text-fill: #ffffff;
+    -fx-border-color: #6a1b9a;
+    -fx-border-width: 1px;
+}
+
+/* Chat Messages */
+.chat-list-cell {
+    -fx-padding: 5px;
+}
+
+.chat-message-sender {
+    -fx-alignment: TOP_LEFT;
+    -fx-text-fill: white;
+    -fx-background-color: #6a1b9a;
+    -fx-padding: 10px;
+    -fx-background-radius: 10;
+}
+
+.chat-message-receiver {
+    -fx-alignment: TOP_RIGHT;
+    -fx-text-fill: white;
+    -fx-background-color: #3c3f41;
+    -fx-padding: 10px;
+    -fx-background-radius: 10;
+}
