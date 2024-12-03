@@ -7,11 +7,11 @@
 ## Compile commands:
 ### (Server):
 #### javac -classpath .;C:\java-libs\* AudioStreamingServer.java
- - javac --module-path "C:\javafx-sdk\lib" --add-modules javafx.controls,javafx.fxml -classpath .;C:\java-libs\* AudioStreamingClientUI.java
- - java -classpath .;C:\java-libs\* AudioStreamingServer
+#### javac --module-path "C:\javafx-sdk\lib" --add-modules javafx.controls,javafx.fxml -classpath .;C:\java-libs\* AudioStreamingClientUI.java
+#### java -classpath .;C:\java-libs\* AudioStreamingServer
 
 
 
-- (Client)
-* java --module-path "C:\javafx-sdk\lib" --add-modules javafx.controls,javafx.fxml -classpath .;C:\java-libs\* AudioStreamingClientUI
+### (Client)
+#### java --module-path "C:\javafx-sdk\lib" --add-modules javafx.controls,javafx.fxml -classpath .;C:\java-libs\* AudioStreamingClientUI
 
