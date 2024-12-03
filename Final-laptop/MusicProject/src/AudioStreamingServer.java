@@ -131,7 +131,7 @@ public class AudioStreamingServer {
 
     private static void broadcastNewTrack() {
         for (ClientHandler client : clients.values()) {
-            client.sendMessage("NEW_TRACK");
+            client.sendTrackList();
         }
     }
 
@@ -428,15 +428,13 @@ public class AudioStreamingServer {
                 if (room != null) {
                     room.sendMemberListTo(this);
                 }
+            } else if (command.equals("REFRESH_TRACKS")) {
+                if (currentRoom != null && currentRoom.getLeader() == this) {
+                    broadcastNewTrack(); // Refresh tracks for all clients in the room
+                }
             }
         }
-
-        private void sendTrackList() {
-            out.println("TRACK_LIST_CLEAR");
-            for (String track : trackList) {
-                out.println("TRACK_LIST " + track);
-            }
-        }
+        
 
         private void createRoom(String roomName, String password) {
             if (!rooms.containsKey(roomName)) {
@@ -471,6 +469,13 @@ public class AudioStreamingServer {
                     room.sendMemberList();
                     // Send the current queue
                     room.sendQueueTo(this);
+                    // Send current track if any
+                    if (room.getCurrentTrack() != null) {
+                        out.println("PLAY_TRACK " + room.getCurrentTrack());
+                        if (room.isPaused()) {
+                            out.println("PAUSE");
+                        }
+                    }
                 } else {
                     out.println("ERROR Incorrect password");
                 }
@@ -652,6 +657,13 @@ public class AudioStreamingServer {
         public void sendMessage(String message) {
             out.println(message);
         }
+
+        public void sendTrackList() {
+            out.println("TRACK_LIST_CLEAR");
+            for (String track : trackList) {
+                out.println("TRACK_LIST " + track);
+            }
+        }
     }
 
     static class Room {
@@ -663,6 +675,7 @@ public class AudioStreamingServer {
         private Deque<String> songQueue = new ArrayDeque<>();
         private Deque<String> previousTracks = new ArrayDeque<>();
         private boolean isPaused = false;
+        private Map<ClientHandler, Integer> pausedFrames = new HashMap<>();
 
         public Room(String roomName, String password, ClientHandler leader) {
             this.roomName = roomName;
@@ -695,8 +708,12 @@ public class AudioStreamingServer {
                 broadcastMessage("USER_JOINED " + member.getUsername(), null);
                 member.sendMessage("ROOM_HEAD " + leader.getUsername());
                 sendMemberList();
+                // Send current track and state
                 if (currentTrack != null) {
                     member.sendMessage("PLAY_TRACK " + currentTrack);
+                    if (isPaused) {
+                        member.sendMessage("PAUSE");
+                    }
                 }
                 // Send current queue
                 sendQueueTo(member);
@@ -735,8 +752,10 @@ public class AudioStreamingServer {
             }
             currentTrack = trackName;
             isPaused = false;
+            pausedFrames.clear();
             broadcastMessage("STOP", null);
             broadcastMessage("PLAY_TRACK " + trackName, null);
+            broadcastQueue();
         }
 
         public void pauseTrack() {
@@ -760,6 +779,7 @@ public class AudioStreamingServer {
         public void stopTrack() {
             currentTrack = null;
             isPaused = false;
+            pausedFrames.clear();
             broadcastMessage("STOP", null);
         }
 
@@ -773,6 +793,8 @@ public class AudioStreamingServer {
             for (ClientHandler client : clients.values()) {
                 client.sendAvailableRooms();
             }
+            // Clear previous tracks
+            previousTracks.clear();
         }
 
         public void kickUser(ClientHandler user) {
@@ -814,7 +836,7 @@ public class AudioStreamingServer {
                 songQueue.addAll(tracks);
                 playNextInQueue();
             } else {
-                leader.out.println("ERROR Playlist is empty or does not exist");
+                leader.sendMessage("ERROR Playlist is empty or does not exist");
             }
         }
 
@@ -825,6 +847,8 @@ public class AudioStreamingServer {
                     previousTracks.push(currentTrack);
                 }
                 currentTrack = nextTrack;
+                isPaused = false;
+                pausedFrames.clear();
                 broadcastMessage("PLAY_TRACK " + nextTrack, null);
                 broadcastMessage("UP_NEXT " + (songQueue.peek() != null ? songQueue.peek() : ""), null);
             } else {
@@ -834,18 +858,42 @@ public class AudioStreamingServer {
         }
 
         public void nextTrack() {
-            playNextInQueue();
+            if (currentTrack != null) {
+                previousTracks.push(currentTrack);
+            }
+            if (!songQueue.isEmpty()) {
+                String nextTrack = songQueue.poll();
+                currentTrack = nextTrack;
+                isPaused = false;
+                pausedFrames.clear();
+                broadcastMessage("STOP", null);
+                broadcastMessage("PLAY_TRACK " + nextTrack, null);
+                broadcastQueue();
+            } else {
+                if (currentTrack != null) {
+                    // Do not stop the current track
+                    leader.sendMessage("ERROR Queue is empty.");
+                } else {
+                    leader.sendMessage("ERROR Queue is empty.");
+                }
+            }
         }
 
         public void previousTrack() {
             if (!previousTracks.isEmpty()) {
                 String prevTrack = previousTracks.pop();
                 if (currentTrack != null && !currentTrack.equals(prevTrack)) {
+                    // Push currentTrack onto songQueue
                     songQueue.addFirst(currentTrack);
                 }
                 currentTrack = prevTrack;
+                isPaused = false;
+                pausedFrames.clear();
+                broadcastMessage("STOP", null);
                 broadcastMessage("PLAY_TRACK " + prevTrack, null);
-                broadcastMessage("UP_NEXT " + (songQueue.peek() != null ? songQueue.peek() : ""), null);
+                broadcastQueue();
+            } else {
+                leader.sendMessage("ERROR No previous track available.");
             }
         }
 
@@ -868,6 +916,14 @@ public class AudioStreamingServer {
         public void sendQueueTo(ClientHandler member) {
             String queueString = String.join(",", songQueue);
             member.sendMessage("UPDATE_QUEUE " + queueString);
+        }
+
+        public String getCurrentTrack() {
+            return currentTrack;
+        }
+
+        public boolean isPaused() {
+            return isPaused;
         }
     }
 
@@ -903,6 +959,10 @@ public class AudioStreamingServer {
                 }
 
                 FileInputStream fis = new FileInputStream(audioFile);
+                // Skip to the start frame (approximate)
+                long bytesToSkip = startFrame * 418; // Approximate bytes per frame
+                fis.skip(bytesToSkip);
+
                 byte[] buffer = new byte[4096];
                 int bytesRead;
                 try {

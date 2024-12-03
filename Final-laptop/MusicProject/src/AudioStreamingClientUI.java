@@ -69,6 +69,7 @@ public class AudioStreamingClientUI extends Application {
     private Button addTrackToPlaylistButton = new Button("Add Track to Playlist");
     private Button addPlaylistToQueueButton = new Button("Add Playlist to Queue");
     private Button clearQueueButton = new Button("Clear Queue");
+    private Button shuffleQueueButton = new Button("Shuffle Queue");
     private boolean isLooping = false;
 
     private Map<String, List<String>> playlists = new HashMap<>();
@@ -151,6 +152,8 @@ public class AudioStreamingClientUI extends Application {
 
         HBox roomControlButtons = new HBox(10, passLeadershipButton, kickUserButton);
 
+        roomNameField.setPromptText("Enter room name...");
+
         VBox leftPane = new VBox(10, new Label("Rooms"), roomSearchField,
                 roomListView, roomNameField, roomPasswordField,
                 createRoomButton, joinRoomButton,
@@ -160,33 +163,48 @@ public class AudioStreamingClientUI extends Application {
         leftPane.setPadding(new Insets(10));
 
         // Center pane: Tracks and playback controls
+        trackListView.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
 
-        // Arrange buttons in grid
+
+        playlistNameField.setPromptText("Enter playlist name...");
+
+        GridPane playlistButtonGrid = new GridPane();
+        playlistButtonGrid.setHgap(10);
+        playlistButtonGrid.setVgap(10);
+        playlistButtonGrid.add(createPlaylistButton, 0, 0);
+        playlistButtonGrid.add(deletePlaylistButton, 1, 0);
+        playlistButtonGrid.add(renamePlaylistButton, 2, 0);
+        playlistButtonGrid.add(sharePlaylistButton, 3, 0);
+        playlistButtonGrid.add(addTrackToPlaylistButton, 0, 1);
+        playlistButtonGrid.add(deleteFromPlaylistButton, 1, 1);
+        playlistButtonGrid.add(addPlaylistToQueueButton, 2, 1);
+
+
         GridPane buttonGrid = new GridPane();
         buttonGrid.setHgap(10);
         buttonGrid.setVgap(10);
-        buttonGrid.add(addToQueueButton, 0, 0);
-        buttonGrid.add(removeFromQueueButton, 1, 0);
-        buttonGrid.add(playButton, 2, 0);
-        buttonGrid.add(playSelectedTrackButton, 0, 1);
-        buttonGrid.add(previousTrackButton, 1, 1);
-        buttonGrid.add(nextTrackButton, 2, 1);
+        buttonGrid.add(playButton, 0, 0);
+        buttonGrid.add(playSelectedTrackButton, 1, 0);
+        buttonGrid.add(previousTrackButton, 0, 1);
+        buttonGrid.add(nextTrackButton, 1, 1);
         buttonGrid.add(loopButton, 0, 2);
         buttonGrid.add(pauseButton, 1, 2);
-        buttonGrid.add(stopButton, 2, 2);
+        buttonGrid.add(stopButton, 0, 3);
 
-        HBox playlistButtonBox = new HBox(10, createPlaylistButton, deletePlaylistButton, renamePlaylistButton, sharePlaylistButton);
-        HBox playlistTrackButtonBox = new HBox(10, addTrackToPlaylistButton, deleteFromPlaylistButton, addPlaylistToQueueButton);
         VBox centerPane = new VBox(10, new Label("Tracks"), trackListView,
                 refreshTracksButton, new Label("Playlists"), playlistListView,
-                playlistNameField, playlistButtonBox, playlistTracksView,
-                playlistTrackButtonBox, buttonGrid, upNextLabel, statusLabel);
+                playlistNameField, playlistButtonGrid, playlistTracksView,
+                buttonGrid, upNextLabel, statusLabel);
         centerPane.setPadding(new Insets(10));
 
         // Right pane: Chat area and Queue
+        messageField.setPromptText("Type your message here...");
         chatListView.setFocusTraversable(false);
+
+        HBox queueButtonBox = new HBox(10, addToQueueButton, removeFromQueueButton, shuffleQueueButton, clearQueueButton);
+
         VBox rightPane = new VBox(10, new Label("Chat"), chatListView,
-                messageField, new Label("Queue"), queueListView, clearQueueButton);
+                messageField, new Label("Queue"), queueListView, queueButtonBox);
         rightPane.setPadding(new Insets(10));
 
         mainLayout.setLeft(leftPane);
@@ -233,6 +251,7 @@ public class AudioStreamingClientUI extends Application {
         pauseButton.setOnAction(e -> handlePauseButton());
         stopButton.setOnAction(e -> handleStopButton());
         clearQueueButton.setOnAction(e -> handleClearQueue());
+        shuffleQueueButton.setOnAction(e -> handleShuffleQueue());
 
         createRoomButton.setOnAction(e -> handleCreateRoom(roomNameField,
                 roomPasswordField));
@@ -255,26 +274,26 @@ public class AudioStreamingClientUI extends Application {
                     if (newVal != null) {
                         playlistTracksView.getItems().addAll(playlists.get(newVal));
                     }
-                    // Unselect other lists
+
                     trackListView.getSelectionModel().clearSelection();
                     queueListView.getSelectionModel().clearSelection();
                 });
 
         trackListView.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
-            // Unselect other lists
+
             playlistListView.getSelectionModel().clearSelection();
             playlistTracksView.getSelectionModel().clearSelection();
             queueListView.getSelectionModel().clearSelection();
         });
 
         playlistTracksView.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
-            // Unselect other lists
+
             trackListView.getSelectionModel().clearSelection();
             queueListView.getSelectionModel().clearSelection();
         });
 
         queueListView.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
-            // Unselect other lists
+
             trackListView.getSelectionModel().clearSelection();
             playlistTracksView.getSelectionModel().clearSelection();
         });
@@ -283,7 +302,13 @@ public class AudioStreamingClientUI extends Application {
         deleteRoomButton.setOnAction(e -> handleDeleteRoom());
         kickUserButton.setOnAction(e -> handleKickUser());
         refreshRoomsButton.setOnAction(e -> sendCommand("GET_ROOMS"));
-        refreshTracksButton.setOnAction(e -> sendCommand("GET_TRACKS"));
+        refreshTracksButton.setOnAction(e -> {
+            if (inRoom && isRoomLeader) {
+                sendCommand("REFRESH_TRACKS");
+            } else {
+                sendCommand("GET_TRACKS");
+            }
+        });
         roomListView.getSelectionModel().selectedItemProperty()
                 .addListener((obs, oldVal, newVal) -> {
                     roomNameField.setText(newVal);
@@ -340,7 +365,10 @@ public class AudioStreamingClientUI extends Application {
     }
 
     private void processServerMessage(String message) {
-        if (message.startsWith("TRACK_LIST")) {
+        if (message.equals("TRACK_LIST_CLEAR")) {
+            trackList.clear();
+            trackListView.getItems().clear();
+        } else if (message.startsWith("TRACK_LIST")) {
             String track = message.substring("TRACK_LIST ".length());
             if (!trackList.contains(track)) {
                 trackList.add(track);
@@ -422,6 +450,7 @@ public class AudioStreamingClientUI extends Application {
                     addChatMessage(msg);
                 }
             }
+            previousTracks.clear();
             // Sync the queue
             sendCommand("UPDATE_QUEUE " + serializeQueue());
         } else if (message.startsWith("JOINED_ROOM")) {
@@ -444,6 +473,7 @@ public class AudioStreamingClientUI extends Application {
                     addChatMessage(msg);
                 }
             }
+            previousTracks.clear();
         } else if (message.startsWith("LEFT_ROOM")) {
             String roomName = message.substring("LEFT_ROOM ".length());
             statusLabel.setText("Left room: " + roomName);
@@ -457,6 +487,7 @@ public class AudioStreamingClientUI extends Application {
             roomPasswordLabel.setText("Room Password: ");
             currentRoomName = "";
             chatListView.getItems().clear();
+            previousTracks.clear();
 
             // Restore personal queue
             songQueue.clear();
@@ -618,7 +649,7 @@ public class AudioStreamingClientUI extends Application {
             dataOut.writeInt(pausedOnFrame);
             dataOut.flush();
 
-            // Now read the audio data
+            //  read the audio data
             BufferedInputStream bufferedIn = new BufferedInputStream(dataIn);
 
             player = new AdvancedPlayer(bufferedIn);
@@ -626,25 +657,29 @@ public class AudioStreamingClientUI extends Application {
                 @Override
                 public void playbackFinished(PlaybackEvent evt) {
                     if (!isPaused) {
-                        if (isLooping) {
-                            pausedOnFrame = 0;
-                            Platform.runLater(() -> playAudioStream(currentTrack));
-                        } else {
-                            isPlaying = false;
-                            pausedOnFrame = 0;
-                            Platform.runLater(() -> {
-                                if (!songQueue.isEmpty()) {
-                                    String nextTrack = songQueue.poll();
-                                    if (inRoom && !isRoomLeader) {
-                                        // Do nothing, wait for leader's command
-                                    } else {
-                                        sendCommand("PLAY_TRACK " + nextTrack);
-                                    }
-                                    updateQueueList();
-                                    updateUpNextLabel();
+                        pausedOnFrame = 0;
+                        isPlaying = false;
+                        Platform.runLater(() -> {
+                            if (isLooping && currentTrack != null) {
+                                // Add currentTrack back to the queue if looping
+                                songQueue.addFirst(currentTrack);
+                            } else {
+                                previousTracks.push(currentTrack);
+                            }
+                            if (!songQueue.isEmpty()) {
+                                String nextTrack = songQueue.poll();
+                                if (inRoom && !isRoomLeader) {
+                                    // Do nothing, wait for leader's command
+                                } else {
+                                    sendCommand("PLAY_TRACK " + nextTrack);
                                 }
-                            });
-                        }
+                                updateQueueList();
+                                updateUpNextLabel();
+                                if (inRoom && isRoomLeader) {
+                                    sendCommand("UPDATE_QUEUE " + serializeQueue());
+                                }
+                            }
+                        });
                     } else {
                         pausedOnFrame = evt.getFrame();
                     }
@@ -712,20 +747,26 @@ public class AudioStreamingClientUI extends Application {
     private void handlePlayButton() {
         if (!isPlaying) {
             if (!songQueue.isEmpty()) {
-                String nextTrack = songQueue.peek();
+                String nextTrack = songQueue.poll();
                 sendCommand("PLAY_TRACK " + nextTrack);
                 updateQueueList();
                 updateUpNextLabel();
+                if (inRoom && isRoomLeader) {
+                    sendCommand("UPDATE_QUEUE " + serializeQueue());
+                }
             } else {
                 showAlert("Queue is empty.");
             }
         } else {
             sendCommand("STOP");
             if (!songQueue.isEmpty()) {
-                String nextTrack = songQueue.peek();
+                String nextTrack = songQueue.poll();
                 sendCommand("PLAY_TRACK " + nextTrack);
                 updateQueueList();
                 updateUpNextLabel();
+                if (inRoom && isRoomLeader) {
+                    sendCommand("UPDATE_QUEUE " + serializeQueue());
+                }
             } else {
                 showAlert("Queue is empty.");
             }
@@ -747,17 +788,11 @@ public class AudioStreamingClientUI extends Application {
             if (inRoom && !isRoomLeader) {
                 showAlert("Only the room leader can play or stop the song in a room.");
             } else {
-                // Check if selectedTrack is at the top of the queue
-                if (!songQueue.isEmpty() && songQueue.peek().equals(selectedTrack)) {
-                    // Do nothing, track is already at the top
-                } else if (songQueue.contains(selectedTrack)) {
-                    // Move it to the top
-                    songQueue.remove(selectedTrack);
-                    songQueue.addFirst(selectedTrack);
-                } else {
-                    // Add to the top
-                    songQueue.addFirst(selectedTrack);
-                }
+                // Remove selectedTrack from queue if it's already there
+                songQueue.remove(selectedTrack);
+                // Add to the top
+                songQueue.addFirst(selectedTrack);
+
                 updateQueueList();
                 sendCommand("STOP");
                 sendCommand("PLAY_TRACK " + selectedTrack);
@@ -773,7 +808,8 @@ public class AudioStreamingClientUI extends Application {
         if (inRoom && !isRoomLeader) {
             showAlert("Only the room leader can change tracks in a room.");
         } else {
-            if (!isPlaying && !songQueue.isEmpty()) {
+            if (!songQueue.isEmpty()) {
+                sendCommand("STOP");
                 String nextTrack = songQueue.poll();
                 sendCommand("PLAY_TRACK " + nextTrack);
                 updateQueueList();
@@ -781,21 +817,13 @@ public class AudioStreamingClientUI extends Application {
                 if (inRoom && isRoomLeader) {
                     sendCommand("UPDATE_QUEUE " + serializeQueue());
                 }
-            } else if (isPlaying) {
-                sendCommand("STOP");
-                if (!songQueue.isEmpty()) {
-                    String nextTrack = songQueue.poll();
-                    sendCommand("PLAY_TRACK " + nextTrack);
-                    updateQueueList();
-                    updateUpNextLabel();
-                    if (inRoom && isRoomLeader) {
-                        sendCommand("UPDATE_QUEUE " + serializeQueue());
-                    }
+            } else {
+                if (isPlaying) {
+                    showAlert("Queue is empty.");
+                    // Do not stop the currently playing track
                 } else {
                     showAlert("Queue is empty.");
                 }
-            } else {
-                showAlert("Queue is empty.");
             }
         }
     }
@@ -807,6 +835,7 @@ public class AudioStreamingClientUI extends Application {
             if (!previousTracks.isEmpty()) {
                 String prevTrack = previousTracks.pop();
                 if (currentTrack != null && !currentTrack.equals(prevTrack)) {
+                    // Push currentTrack onto songQueue
                     songQueue.addFirst(currentTrack);
                 }
                 sendCommand("STOP");
@@ -858,6 +887,21 @@ public class AudioStreamingClientUI extends Application {
                 if (inRoom && isRoomLeader) {
                     sendCommand("UPDATE_QUEUE " + serializeQueue());
                 }
+            }
+        }
+    }
+
+    private void handleShuffleQueue() {
+        if (inRoom && !isRoomLeader) {
+            showAlert("Only the room leader can modify the queue in a room.");
+        } else {
+            List<String> queueList = new ArrayList<>(songQueue);
+            Collections.shuffle(queueList);
+            songQueue.clear();
+            songQueue.addAll(queueList);
+            updateQueueList();
+            if (inRoom && isRoomLeader) {
+                sendCommand("UPDATE_QUEUE " + serializeQueue());
             }
         }
     }
@@ -921,7 +965,7 @@ public class AudioStreamingClientUI extends Application {
             }
             sendCommand("CREATE_PLAYLIST " + playlistName);
             playlistNameField.clear();
-            // Update playlistListView immediately
+
             playlists.put(playlistName, new ArrayList<>());
             if (!playlistListView.getItems().contains(playlistName)) {
                 playlistListView.getItems().add(playlistName);
@@ -934,7 +978,7 @@ public class AudioStreamingClientUI extends Application {
                 .getSelectedItem();
         if (selectedPlaylist != null) {
             sendCommand("DELETE_PLAYLIST " + selectedPlaylist);
-            // Update playlistListView immediately
+
             playlists.remove(selectedPlaylist);
             playlistListView.getItems().remove(selectedPlaylist);
             playlistTracksView.getItems().clear();
@@ -953,7 +997,7 @@ public class AudioStreamingClientUI extends Application {
             result.ifPresent(newName -> {
                 if (!newName.isEmpty()) {
                     sendCommand("RENAME_PLAYLIST " + selectedPlaylist + " " + newName);
-                    // Update immediately
+
                     List<String> tracks = playlists.remove(selectedPlaylist);
                     playlists.put(newName, tracks);
                     int index = playlistListView.getItems().indexOf(selectedPlaylist);
@@ -1043,7 +1087,7 @@ public class AudioStreamingClientUI extends Application {
             dialog.setHeaderText("Add Track to Playlist");
             dialog.setContentText("Choose a playlist:");
             Optional<String> result = dialog.showAndWait();
-            final String trackToAdd = selectedTrack; // Make it final for use in lambda
+            final String trackToAdd = selectedTrack;
             result.ifPresent(playlistName -> {
                 sendCommand("ADD_TO_PLAYLIST " + playlistName + " " + trackToAdd);
             });
@@ -1143,7 +1187,7 @@ public class AudioStreamingClientUI extends Application {
     }
 
     private void handleJoinRequest(String requester) {
-        // Handle join request if implemented
+
     }
 
     private void updateLeadership(String leaderName) {
@@ -1198,6 +1242,7 @@ public class AudioStreamingClientUI extends Application {
         addToQueueButton.setDisable(!enable);
         removeFromQueueButton.setDisable(!enable);
         clearQueueButton.setDisable(!enable);
+        shuffleQueueButton.setDisable(!enable);
         addPlaylistToQueueButton.setDisable(!enable);
     }
 
