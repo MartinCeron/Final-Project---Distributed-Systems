@@ -4,7 +4,7 @@
 - Additionally, add the lib folder located within the javafxsdk to your system's PATH environment variable.
 - If you encounter any issues with compilation due to your JDK version, we recommend using JDK 21. 
 
-## compile commands:
+## Compile commands:
 javac -classpath .;C:\java-libs\* AudioStreamingServer.java
 javac --module-path "C:\javafx-sdk\lib" --add-modules javafx.controls,javafx.fxml -classpath .;C:\java-libs\* AudioStreamingClientUI.java
 
